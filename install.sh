@@ -142,8 +142,8 @@ echo "Installation completed."
 
 # Start packet forwarder as a service
 cp ./start.sh $INSTALL_DIR/bin/
-cp ./lora-generic-gateway.service /etc/systemd/system/
-systemctl enable lora-generic-gateway.service
+cp ./lora-box.service /etc/systemd/system/
+systemctl enable lora-box.service
 
 echo "The system will reboot in 5 seconds..."
 sleep 5
