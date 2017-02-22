@@ -117,7 +117,7 @@ make
 
 popd
 
-# Symlink poly packet forwarder
+# Symlink packet forwarder
 if [ ! -d bin ]; then mkdir bin; fi
 if [ -f ./bin/lora_pkt_fwd ]; then rm ./bin/lora_pkt_fwd; fi
 ln -s $INSTALL_DIR/packet_forwarder/lora_pkt_fwd/lora_pkt_fwd ./bin/lora_pkt_fwd
