@@ -27,7 +27,8 @@ fi
 
 if [ ! -f iC880-SPI_reset.sh ]; then
 	wget https://raw.githubusercontent.com/rnicolas/iC880-SPI-reset/master/iC880-SPI_reset.sh
-	sed -i -e '$i \ ./home/iC880-SPI_reset.sh \n' /etc/rc.local
+	chmod +x iC880-SPI_reset.sh
+	sed -i -e '$i \/home/iC880-SPI_reset.sh \n' /etc/rc.local
 fi
 
 popd
