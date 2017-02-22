@@ -12,6 +12,14 @@ if [[ $1 != "" ]]; then VERSION=$1; fi
 
 echo "LoRa Box installer"
 
+echo ""
+echo ""
+echo "Activating SPI port on Raspberry PI"
+
+pushd /boot
+sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
+popd
+
 # Update the gateway installer to the correct branch
 echo "Updating installer files..."
 OLD_HEAD=$(git rev-parse HEAD)
