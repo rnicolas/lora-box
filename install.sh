@@ -11,13 +11,25 @@ fi
 if [[ $1 != "" ]]; then VERSION=$1; fi
 
 echo "LoRa Box installer"
-
 echo ""
 echo ""
 echo "Activating SPI port on Raspberry PI"
 
 pushd /boot
 sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
+popd
+
+pushd /home
+if [ -f powerBtn.py ]; then
+	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
+	sed -i -e '$i \python /home/powerBtn.py &\n' /etc/rc.local
+fi
+
+if [ -f iC880-SPI_reset.sh ]; then
+	wget https://raw.githubusercontent.com/rnicolas/iC880-SPI-reset/master/iC880-SPI_reset.sh
+	sed -i -e '$i \ ./home/iC880-SPI_reset.sh \n' /etc/rc.local
+fi
+
 popd
 
 # Update the gateway installer to the correct branch
@@ -104,8 +116,6 @@ else
     git reset --hard
     git pull
 fi
-
-sed -i -e 's/PLATFORM= kerlink/PLATFORM= imst_rpi/g' ./libloragw/library.cfg
 
 make
 
