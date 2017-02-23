@@ -19,16 +19,16 @@ pushd /boot
 sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
 popd
 
-pushd /home
+pushd /usr/local/bin
 if [ ! -f powerBtn.py ]; then
 	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
-	sed -i -e '$i \python /home/powerBtn.py &\n' /etc/rc.local
+	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
 fi
 
 if [ ! -f iC880-SPI_reset.sh ]; then
 	wget https://raw.githubusercontent.com/rnicolas/iC880-SPI-reset/master/iC880-SPI_reset.sh
 	chmod +x iC880-SPI_reset.sh
-	sed -i -e '$i \/home/iC880-SPI_reset.sh \n' /etc/rc.local
+	sed -i -e '$i \/usr/local/bin/iC880-SPI_reset.sh\n' /etc/rc.local
 fi
 
 popd
