@@ -13,7 +13,7 @@ if [[ $1 != "" ]]; then VERSION=$1; fi
 echo "LoRa Box installer"
 echo
 # Check dependencies
-echo "Installing dependencies..."
+echo "Updating OS..."
 apt-get update
 apt-get -y upgrade
 echo
