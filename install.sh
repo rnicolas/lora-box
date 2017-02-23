@@ -31,14 +31,6 @@ if [ ! -f powerBtn.py ]; then
 	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
 fi
 
-echo "Adding a script to reset iC880 concentrator on boot"
-
-if [ ! -f iC880-SPI_reset.sh ]; then
-	wget https://raw.githubusercontent.com/rnicolas/iC880-SPI-reset/master/iC880-SPI_reset.sh
-	chmod +x iC880-SPI_reset.sh
-	sed -i -e '$i \/usr/local/bin/iC880-SPI_reset.sh\n' /etc/rc.local
-fi
-
 popd
 
 # Update the gateway installer to the correct branch
