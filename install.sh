@@ -12,6 +12,10 @@ if [[ $1 != "" ]]; then VERSION=$1; fi
 
 echo "LoRa Box installer"
 echo
+# Check dependencies
+echo "Installing dependencies..."
+apt-get update
+apt-get upgrade
 echo
 echo "Activating SPI port on Raspberry PI"
 
@@ -76,9 +80,9 @@ printf "       Host name [lora-box]:"
 read NEW_HOSTNAME
 if [[ $NEW_HOSTNAME == "" ]]; then NEW_HOSTNAME="lora-box"; fi
 
-printf "       Descriptive name [RPi-ic880a]:"
+printf "       Descriptive name [RPi-iC880a]:"
 read GATEWAY_NAME
-if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-ic880a"; fi
+if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-iC880a"; fi
 
 printf "       Contact email: "
 read GATEWAY_EMAIL
@@ -151,7 +155,7 @@ LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 # Remove old config file
 if [ -e $LOCAL_CONFIG_FILE ]; then rm $LOCAL_CONFIG_FILE; fi;
 
-printf "       Server Address ["router.eu.thethings.network"]:"
+printf "       Server Address ['router.eu.thethings.network']:"
 read NEW_SERVER
 if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="router.eu.thethings.network"; fi
 
@@ -162,7 +166,7 @@ popd
 
 echo "Gateway EUI is: $GATEWAY_EUI"
 echo "The hostname is: $NEW_HOSTNAME"
-#echo "Check gateway status here (find your EUI): http://staging.thethingsnetwork.org/gatewaystatus/"
+echo "The Gateway is pointing to: $NEW_SERVER"
 echo
 echo "Installation completed."
 
