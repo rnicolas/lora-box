@@ -15,7 +15,7 @@ echo
 # Check dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get -Y upgrade
+apt-get -y upgrade
 echo
 echo "Activating SPI port on Raspberry PI"
 
