@@ -11,19 +11,23 @@ fi
 if [[ $1 != "" ]]; then VERSION=$1; fi
 
 echo "LoRa Box installer"
-echo ""
-echo ""
+echo
+echo
 echo "Activating SPI port on Raspberry PI"
 
 pushd /boot
 sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
 popd
 
+echo "Adding a script to power off RPi using pin 26"
+
 pushd /usr/local/bin
 if [ ! -f powerBtn.py ]; then
 	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
 	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
 fi
+
+echo "Adding a script to reset iC880 concentrator on boot"
 
 if [ ! -f iC880-SPI_reset.sh ]; then
 	wget https://raw.githubusercontent.com/rnicolas/iC880-SPI-reset/master/iC880-SPI_reset.sh
@@ -147,8 +151,11 @@ LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 # Remove old config file
 if [ -e $LOCAL_CONFIG_FILE ]; then rm $LOCAL_CONFIG_FILE; fi;
 
+printf "       Server Address ["router.eu.thethings.network"]:"
+read NEW_SERVER
+if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="router.eu.thethings.network"; fi
 
-echo -e "{\n\t\"gateway_conf\": {\n\t\t\"gateway_ID\": \"$GATEWAY_EUI\",\n\t\t\"server_address\": \"localhost\",\n\t\t\"serv_port_up\": 1700,\n\t\t\"serv_port_down\": 1700,\n\t\t\"ref_latitude\": $GATEWAY_LAT,\n\t\t\"ref_longitude\": $GATEWAY_LON,\n\t\t\"ref_altitude\": $GATEWAY_ALT,\n\t\t\"contact_email\": \"$GATEWAY_EMAIL\",\n\t\t\"description\": \"$GATEWAY_NAME\" \n\t}\n}" >$LOCAL_CONFIG_FILE
+echo -e "{\n\t\"gateway_conf\": {\n\t\t\"gateway_ID\": \"$GATEWAY_EUI\",\n\t\t\"server_address\": \"$NEW_SERVER\",\n\t\t\"serv_port_up\": 1700,\n\t\t\"serv_port_down\": 1700,\n\t\t\"ref_latitude\": $GATEWAY_LAT,\n\t\t\"ref_longitude\": $GATEWAY_LON,\n\t\t\"ref_altitude\": $GATEWAY_ALT,\n\t\t\"contact_email\": \"$GATEWAY_EMAIL\",\n\t\t\"description\": \"$GATEWAY_NAME\" \n\t}\n}" >$LOCAL_CONFIG_FILE
 
 
 popd
@@ -161,6 +168,9 @@ echo "Installation completed."
 
 # Start packet forwarder as a service
 cp ./start.sh $INSTALL_DIR/bin/
+pushd $INSTALL_DIR/bin/
+chmod +x start.sh
+popd
 cp ./lora-box.service /etc/systemd/system/
 systemctl enable lora-box.service
 

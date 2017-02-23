@@ -2,8 +2,8 @@
 Description=LoRa Box
 
 [Service]
-WorkingDirectory=/opt/lora-box/lora-gateway/bin/
-ExecStart=/opt/lora-box/lora-gateway/bin/start.sh
+WorkingDirectory=/opt/lora-box/bin/
+ExecStart=/opt/lora-box/bin/start.sh
 SyslogIdentifier=lora-box
 Restart=on-failure
 RestartSec=5
