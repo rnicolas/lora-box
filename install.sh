@@ -15,7 +15,7 @@ echo
 # Check dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get upgrade
+apt-get -Y upgrade
 echo
 echo "Activating SPI port on Raspberry PI"
 
@@ -76,6 +76,7 @@ GATEWAY_EUI=${GATEWAY_EUI^^} # toupper
 
 echo "Detected EUI $GATEWAY_EUI from $GATEWAY_EUI_NIC"
 
+# Setting personal configuration of LoRaWAN Gateway
 printf "       Host name [lora-box]:"
 read NEW_HOSTNAME
 if [[ $NEW_HOSTNAME == "" ]]; then NEW_HOSTNAME="lora-box"; fi
@@ -98,8 +99,6 @@ if [[ $GATEWAY_LON == "" ]]; then GATEWAY_LON=0; fi
 printf "       Altitude [0]: "
 read GATEWAY_ALT
 if [[ $GATEWAY_ALT == "" ]]; then GATEWAY_ALT=0; fi
-
-
 
 # Change hostname if needed
 CURRENT_HOSTNAME=$(hostname)
@@ -125,7 +124,7 @@ else
     git reset --hard
     git pull
 fi
-
+sed -i -e 's/PLATFORM= kerlink/PLATFORM= imst_rpi/g' ./libloragw/library.cfg
 make
 
 popd
@@ -153,14 +152,13 @@ cp -f ./packet_forwarder/lora_pkt_fwd/global_conf.json ./bin/global_conf.json
 LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 
 # Remove old config file
-if [ -e $LOCAL_CONFIG_FILE ]; then rm $LOCAL_CONFIG_FILE; fi;
+if [ -e $LOCAL_CONFIG_FILE ]; then rm $LOCAL_CONFIG_FILE; fi
 
 printf "       Server Address ['router.eu.thethings.network']:"
 read NEW_SERVER
 if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="router.eu.thethings.network"; fi
 
 echo -e "{\n\t\"gateway_conf\": {\n\t\t\"gateway_ID\": \"$GATEWAY_EUI\",\n\t\t\"server_address\": \"$NEW_SERVER\",\n\t\t\"serv_port_up\": 1700,\n\t\t\"serv_port_down\": 1700,\n\t\t\"ref_latitude\": $GATEWAY_LAT,\n\t\t\"ref_longitude\": $GATEWAY_LON,\n\t\t\"ref_altitude\": $GATEWAY_ALT,\n\t\t\"contact_email\": \"$GATEWAY_EMAIL\",\n\t\t\"description\": \"$GATEWAY_NAME\" \n\t}\n}" >$LOCAL_CONFIG_FILE
-
 
 popd
 
