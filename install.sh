@@ -168,6 +168,27 @@ popd
 cp ./lora-box.service /etc/systemd/system/
 systemctl enable lora-box.service
 
+echo "Installing Mosquitto MQTT server"
+
+http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key
+sudo apt-key add mosquitto-repo.gpg.key
+rm mosquito-repo.gpg.key
+pushd /etc/apt/sources.list.d/
+wget http://repo.mosquitto.org/debian/mosquitto-jessie.list
+popd
+
+apt-get update
+apt-get install mosquitto
+
+echo "Installing LoRa Gateway Bridge"
+
+DISTRIB_ID = debian
+DISTRIB_CODENAME = jessie
+
+apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
+echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing" | sudo tee /etc/apt/sources.list.d/loraserver.list
+apt-get update
+
 echo "The system will reboot in 5 seconds..."
 sleep 5
 shutdown -r now
