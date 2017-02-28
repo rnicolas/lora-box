@@ -146,9 +146,9 @@ LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 # Remove old config file
 if [ -e $LOCAL_CONFIG_FILE ]; then rm $LOCAL_CONFIG_FILE; fi
 
-printf "       Server Address ['router.eu.thethings.network']:"
+printf "       Server Address ['localhost']:"
 read NEW_SERVER
-if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="router.eu.thethings.network"; fi
+if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="localhost"; fi
 
 echo -e "{\n\t\"gateway_conf\": {\n\t\t\"gateway_ID\": \"$GATEWAY_EUI\",\n\t\t\"server_address\": \"$NEW_SERVER\",\n\t\t\"serv_port_up\": 1700,\n\t\t\"serv_port_down\": 1700,\n\t\t\"ref_latitude\": $GATEWAY_LAT,\n\t\t\"ref_longitude\": $GATEWAY_LON,\n\t\t\"ref_altitude\": $GATEWAY_ALT,\n\t\t\"contact_email\": \"$GATEWAY_EMAIL\",\n\t\t\"description\": \"$GATEWAY_NAME\" \n\t}\n}" >$LOCAL_CONFIG_FILE
 
@@ -192,6 +192,28 @@ echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing"
 apt-get update
 
 apt-get install -y lora-gateway-bridge
+
+echo "Installing LoRaWAN Server"
+
+apt-get install -y redis-server
+apt-get install -y loraserver
+
+echo "Installing LoRa Application Server"
+
+apt-get install -y postgresql
+
+#to-do: psql script to create user and database.
+echo "Type here the password for postgresql database ['dbpassword']"
+read DB_PASSWORD
+if [[ $DB_PASSWORD == "" ]]; then DB_PASSWORD='dbpassword'; fi
+#create role loraserver with login password $DB_PASSWORD;
+#create database loraserver with owner loraserver;
+
+apt-get install -y lora-app-server
+
+pushd /etc/default
+sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost/POSTGRES_DSN=postgres:\/\/loraserver:'"$DB_PASSWORD"'@localhost/g' ./lora-app-server
+popd
 
 echo "The system will reboot in 5 seconds..."
 sleep 5
