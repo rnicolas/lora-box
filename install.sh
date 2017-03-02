@@ -210,7 +210,7 @@ echo "Installing LoRa Application Server"
 
 apt-get install -y postgresql
 
-#to-do: psql script to create user and database.
+#psql script to create user and database.
 echo "Type here the password for postgresql database ['dbpassword']"
 read DB_PASSWORD
 if [[ $DB_PASSWORD == "" ]]; then DB_PASSWORD='dbpassword'; fi
@@ -218,7 +218,7 @@ if [[ $DB_PASSWORD == "" ]]; then DB_PASSWORD='dbpassword'; fi
 -u postgres psql -c "create database loraserver with owner loraserver;"
 apt-get install -y lora-app-server
 
-pushd /etc/default
+pushd /etc/default/
 sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost/POSTGRES_DSN=postgres:\/\/loraserver:'"$DB_PASSWORD"'@localhost/g' ./lora-app-server
 popd
 
