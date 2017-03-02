@@ -12,11 +12,19 @@ if [[ $1 != "" ]]; then VERSION=$1; fi
 
 echo "LoRa Box installer"
 echo
+# Disabling Blank Screen and PowerDown when Pi is not active.
+echo "Disabling blank screen after 30 minutes of inactivity"
+pushd /etc/kbd/
+sed -i -e 's/BLANK_TIME=30/BLANK_TIME=0/g' ./config
+echo "Disabling Automatic Power Off after 30 minutes of inactivity"
+sed -i -e 's/POWERDOWN_TIME=30/POWERDOWN_TIME=0/g' ./config
+popd
 # Check dependencies
 echo "Updating OS..."
 apt-get update
 apt-get -y upgrade
 echo
+
 echo "Activating SPI port on Raspberry PI"
 
 pushd /boot
@@ -116,7 +124,7 @@ else
     git reset --hard
     git pull
 fi
-sed -i -e 's/PLATFORM= kerlink/PLATFORM= imst_rpi/g' ./libloragw/library.cfg
+#sed -i -e 's/PLATFORM= kerlink/PLATFORM= imst_rpi/g' ./libloragw/library.cfg
 make
 
 popd
@@ -206,9 +214,8 @@ apt-get install -y postgresql
 echo "Type here the password for postgresql database ['dbpassword']"
 read DB_PASSWORD
 if [[ $DB_PASSWORD == "" ]]; then DB_PASSWORD='dbpassword'; fi
-#create role loraserver with login password $DB_PASSWORD;
-#create database loraserver with owner loraserver;
-
+-u postgres psql -c "create role loraserver with login password '$DB_PASSWORD';"
+-u postgres psql -c "create database loraserver with owner loraserver;"
 apt-get install -y lora-app-server
 
 pushd /etc/default
