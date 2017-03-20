@@ -12,6 +12,18 @@ if [[ $1 != "" ]]; then VERSION=$1; fi
 
 echo "LoRa Box installer"
 echo
+# Update the gateway installer to the correct branch
+echo "Updating installer files..."
+OLD_HEAD=$(git rev-parse HEAD)
+git fetch
+git checkout
+git pull
+NEW_HEAD=$(git rev-parse HEAD)
+
+if [[ $OLD_HEAD != $NEW_HEAD ]]; then
+    echo "New installer found. Restarting process..."
+    exec "./install.sh" "$VERSION"
+fi
 # Disabling Blank Screen and PowerDown when Pi is not active.
 echo "Disabling blank screen after 30 minutes of inactivity"
 pushd /etc/kbd/
@@ -41,19 +53,6 @@ fi
 
 popd
 
-# Update the gateway installer to the correct branch
-echo "Updating installer files..."
-OLD_HEAD=$(git rev-parse HEAD)
-git fetch
-git checkout
-git pull
-NEW_HEAD=$(git rev-parse HEAD)
-
-if [[ $OLD_HEAD != $NEW_HEAD ]]; then
-    echo "New installer found. Restarting process..."
-    exec "./install.sh" "$VERSION"
-fi
-
 # Request gateway configuration data
 # There are two ways to do it, manually specify everything
 # or rely on the gateway EUI and retrieve settings files from remote (recommended)
@@ -81,9 +80,9 @@ printf "       Host name [lora-box]:"
 read NEW_HOSTNAME
 if [[ $NEW_HOSTNAME == "" ]]; then NEW_HOSTNAME="lora-box"; fi
 
-printf "       Descriptive name [RPi-iC880a]:"
+printf "       Descriptive name [RPi-iC880A]:"
 read GATEWAY_NAME
-if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-iC880a"; fi
+if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-iC880A"; fi
 
 printf "       Contact email: "
 read GATEWAY_EMAIL
@@ -124,7 +123,6 @@ else
     git reset --hard
     git pull
 fi
-#sed -i -e 's/PLATFORM= kerlink/PLATFORM= imst_rpi/g' ./libloragw/library.cfg
 make
 
 popd
