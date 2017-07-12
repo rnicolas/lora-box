@@ -14,7 +14,6 @@ echo "LoRa Box installer"
 echo
 # Update the gateway installer to the correct branch
 echo "Updating installer files..."
-sudo apt-get install git
 OLD_HEAD=$(git rev-parse HEAD)
 git fetch
 git checkout
@@ -137,7 +136,6 @@ else
     git pull
     git reset --hard
 fi
-
 make
 
 popd
@@ -151,8 +149,7 @@ cp -f ./packet_forwarder/lora_pkt_fwd/global_conf.json ./bin/global_conf.json
 LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 
 # Remove old config file
-if [ -e $LOCAL_CONFIG_FILE ]
-then
+if [ -e $LOCAL_CONFIG_FILE ]; then
 	rm $LOCAL_CONFIG_FILE
 fi
 
@@ -182,10 +179,9 @@ echo "Installing Mosquitto MQTT server"
 
 wget http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key
 apt-key add mosquitto-repo.gpg.key
-rm mosquitto-repo.gpg.key*
+rm mosquitto-repo.gpg.key
 pushd /etc/apt/sources.list.d/
-if [ ! -e mosquitto-jessie.list]
-then
+if [ ! -f mosquitto-jessie.list]; then
 	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
 fi
 popd
@@ -195,18 +191,18 @@ apt-get install -y mosquitto
 
 echo "Installing LoRa Gateway Bridge"
 
-DISTRIB_ID=debian
-DISTRIB_CODENAME=jessie
+DISTRIB_ID="debian"
+DISTRIB_CODENAME="jessie"
 
 apt-get install -y apt-transport-https
 
-SOURCE_LIST=/etc/apt/sources.list.d/loraserver.list
-#check if source list exists
-if [ ! -e $SOURCE_LIST ]
-then
+pushd /etc/apt/sources.list.d/
+#check if loraserver repository is added into sources
+if [ ! -f loraserver.list ]; then
 	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
-	echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing" | tee $SOURCE_LIST
+	echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing" | tee loraserver.list
 fi
+popd
 
 apt-get update
 
@@ -215,22 +211,36 @@ apt-get install -y lora-gateway-bridge
 echo "Installing LoRaWAN Server"
 
 apt-get install -y redis-server
-apt-get install -y loraserver
-
-echo "Installing LoRa Application Server"
 
 apt-get install -y postgresql
 
 #psql script to create user and database.
-echo "Type here the password for postgresql database ['dbpassword']"
+echo "Type here the password for postgresql user loraserver_ns ['dbpassword']"
 read DB_PASSWORD
-if [[ $DB_PASSWORD == "" ]]; then DB_PASSWORD='dbpassword'; fi
-sudo -u postgres psql -c "create role loraserver with login password '$DB_PASSWORD';"
-sudo -u postgres psql -c "create database loraserver with owner loraserver;"
+if [[ $DB_PASSWORD == "" ]]; then
+	DB_PASSWORD='dbpassword'
+fi
+
+sudo -u postgres psql -c "create role loraserver_ns with login password '$DB_PASSWORD';"
+sudo -u postgres psql -c "create database loraserver_ns with owner loraserver_ns;"
+
+apt-get install -y loraserver
+
+echo "Installing LoRa Application Server"
+
+echo "Type here the password for postgresql user loraserver_as ['dbpassword']"
+read DB_PASSWORD
+if [[ $DB_PASSWORD == "" ]]; then
+	DB_PASSWORD='dbpassword'
+fi
+
+sudo -u postgres psql -c "create role loraserver_as with login password '$DB_PASSWORD';"
+sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as;"
+
 apt-get install -y lora-app-server
 
-pushd /etc/default/
-sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost/POSTGRES_DSN=postgres:\/\/loraserver:'"$DB_PASSWORD"'@localhost/g' ./lora-app-server
+pushd /etc/default
+sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost/POSTGRES_DSN=postgres:\/\/loraserver_as:'"$DB_PASSWORD"'@localhost\/loraserver_as?sslmode=disable/g' ./lora-app-server
 popd
 
 echo "The system will reboot in 5 seconds..."
