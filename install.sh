@@ -181,7 +181,7 @@ wget http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key
 apt-key add mosquitto-repo.gpg.key
 rm mosquitto-repo.gpg.key
 pushd /etc/apt/sources.list.d/
-if [ ! -f mosquitto-jessie.list]; then
+if [ ! -f mosquitto-jessie.list ]; then
 	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
 fi
 popd
