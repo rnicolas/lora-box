@@ -188,8 +188,8 @@ apt-get install -y mosquitto
 
 echo "Installing LoRa Gateway Bridge"
 
-DISTRIB_ID = debian
-DISTRIB_CODENAME = jessie
+DISTRIB_ID=debian
+DISTRIB_CODENAME=jessie
 
 apt-get install -y apt-transport-https
 
