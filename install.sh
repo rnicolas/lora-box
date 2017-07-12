@@ -212,7 +212,14 @@ echo "Installing LoRaWAN Server"
 
 apt-get install -y redis-server
 
-apt-get install -y postgresql
+pushd /etc/apt/sources.list.d/
+if [ ! -f pgdg.list ]; then
+	wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+	echo "deb http://apt.postgresql.org/pub/repos/apt/ ${DISTRIB_CODENAME}-pgdg main" | tee pgdg.list
+fi
+popd
+apt-get update
+apt-get install -y postgresql-9.6
 
 #psql script to create user and database.
 echo "Type here the password for postgresql user loraserver_ns ['dbpassword']"
