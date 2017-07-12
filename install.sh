@@ -240,7 +240,8 @@ sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as
 apt-get install -y lora-app-server
 
 pushd /etc/default
-sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost/POSTGRES_DSN=postgres:\/\/loraserver_as:'"$DB_PASSWORD"'@localhost\/loraserver_as?sslmode=disable/g' ./lora-app-server
+sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost\/loraserver_as?sslmode=disable/POSTGRES_DSN=postgres:\/\/loraserver_as:'"$DB_PASSWORD"'@localhost\/loraserver_as?sslmode=disable/g' ./lora-app-server
+sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost\/loraserver_ns?sslmode=disable/POSTGRES_DSN=postgres:\/\/loraserver_ns:'"$DB_PASSWORD"'@localhost\/loraserver_ns?sslmode=disable/g' ./loraserver
 popd
 
 echo "The system will reboot in 5 seconds..."
