@@ -14,12 +14,12 @@ echo "LoRa Box installer"
 echo
 # Update the gateway installer to the correct branch
 echo "Updating installer files..."
+sudo apt-get install git
 OLD_HEAD=$(git rev-parse HEAD)
 git fetch
 git checkout
 git pull
 NEW_HEAD=$(git rev-parse HEAD)
-
 if [[ $OLD_HEAD != $NEW_HEAD ]]; then
     echo "New installer found. Restarting process..."
     exec "./install.sh" "$VERSION"
@@ -46,7 +46,8 @@ popd
 echo "Adding a script to power off RPi using pin 26"
 
 pushd /usr/local/bin
-if [ ! -f powerBtn.py ]; then
+if [ ! -f powerBtn.py ]
+then
 	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
 	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
 fi
@@ -150,7 +151,10 @@ cp -f ./packet_forwarder/lora_pkt_fwd/global_conf.json ./bin/global_conf.json
 LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 
 # Remove old config file
-if [ -e $LOCAL_CONFIG_FILE ]; then rm $LOCAL_CONFIG_FILE; fi
+if [ -e $LOCAL_CONFIG_FILE ]
+then
+	rm $LOCAL_CONFIG_FILE
+fi
 
 printf "       Server Address ['localhost']:"
 read NEW_SERVER
@@ -178,9 +182,12 @@ echo "Installing Mosquitto MQTT server"
 
 wget http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key
 apt-key add mosquitto-repo.gpg.key
-rm mosquitto-repo.gpg.key
+rm mosquitto-repo.gpg.key*
 pushd /etc/apt/sources.list.d/
-wget http://repo.mosquitto.org/debian/mosquitto-jessie.list
+if [ ! -e mosquitto-jessie.list]
+then
+	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
+fi
 popd
 
 apt-get update
@@ -193,8 +200,14 @@ DISTRIB_CODENAME=jessie
 
 apt-get install -y apt-transport-https
 
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
-echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing" | tee /etc/apt/sources.list.d/loraserver.list
+SOURCE_LIST=/etc/apt/sources.list.d/loraserver.list
+#check if source list exists
+if [ ! -e $SOURCE_LIST ]
+then
+	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
+	echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing" | tee $SOURCE_LIST
+fi
+
 apt-get update
 
 apt-get install -y lora-gateway-bridge
