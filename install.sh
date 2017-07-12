@@ -212,8 +212,8 @@ apt-get install -y postgresql
 echo "Type here the password for postgresql database ['dbpassword']"
 read DB_PASSWORD
 if [[ $DB_PASSWORD == "" ]]; then DB_PASSWORD='dbpassword'; fi
--u postgres psql -c "create role loraserver with login password '$DB_PASSWORD';"
--u postgres psql -c "create database loraserver with owner loraserver;"
+sudo -u postgres psql -c "create role loraserver with login password '$DB_PASSWORD';"
+sudo -u postgres psql -c "create database loraserver with owner loraserver;"
 apt-get install -y lora-app-server
 
 pushd /etc/default/
