@@ -175,26 +175,93 @@ popd
 cp ./lora-box.service /etc/systemd/system/
 systemctl enable lora-box.service
 
-echo "Installing Mosquitto MQTT server"
+echo "Adding new repositories for the dependencies"
+
+echo "Adding rpository for Mosquitto MQTT server"
 
 wget http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key
 apt-key add mosquitto-repo.gpg.key
 rm mosquitto-repo.gpg.key
+
 pushd /etc/apt/sources.list.d/
 if [ ! -f mosquitto-jessie.list ]; then
 	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
 fi
-popd
 
+echo "Adding repository for PostgreSQL 9.6"
+
+if [ ! -f backports.list ]; then
+	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
+	gpg --keyserver pgkeys.mit.edu --recv-key 7638D0442B90D010
+	gpg -a --export 7638D0442B90D010 | apt-key add -
+	echo "deb http://ftp.debian.org/debian jessie-backports main" > backports.list
+fi
+
+apt-get install -y apt-transport-https
 apt-get update
-apt-get install -y mosquitto
+apt-get upgrade
+
+echo "Installing dependencies"
+apt-get install -y mosquitto mosquitto-clients redis-server redis-tools postgresql-common/jessie-backports postgresql-client-9.6/jessie-backports postgresql-9.6/jessie-backports
+
+# Create a password file for your mosquitto users, starting with a “root” user.
+# The “-c” parameter creates the new password file. The command will prompt for
+# a new password for the user.
+mosquitto_passwd -c /etc/mosquitto/pwd loraroot
+
+# Add users for the various MQTT protocol users
+mosquitto_passwd /etc/mosquitto/pwd loragw
+read LORA_GW_PASSWD
+if [[ $LORA_GW_PASSWD == "" ]]; then
+	LORA_GW_PASSWD='loragwpasswd'
+fi
+mosquitto_passwd /etc/mosquitto/pwd loraserver
+read LORA_SERVER_PASSWD
+if [[ $LORA_SERVER_PASSWD == "" ]]; then
+	LORA_SERVER_PASSWD='loraserverpasswd'
+fi
+mosquitto_passwd /etc/mosquitto/pwd loraappserver
+read LORA_APP_SERVER_PASSWD
+if [[ $LORA_APP_SERVER_PASSWD == "" ]]; then
+	LORA_APP_SERVER_PASSWD='loraappserverpasswd'
+fi
+
+# Secure the password file
+chmod 600 /etc/mosquitto/pwd
+
+pushd /etc/mosquitto/conf.d/
+if [ ! -f local.conf ]; then
+	echo "allow_anonymous false" > local.conf
+	echo "password_file /etc/mosquitto/pwd" > local.conf
+fi
+
+systemctl restart mosquitto
+
+
+#psql script to create user and database.
+echo "Type here the password for postgresql user loraserver_ns ['dbpassword']"
+read DB_PASSWORD_NS
+if [[ $DB_PASSWORD_NS == "" ]]; then
+	DB_PASSWORD_NS='dbpassword'
+fi
+
+sudo -u postgres psql -c "create role loraserver_ns with login password '$DB_PASSWORD_NS';"
+sudo -u postgres psql -c "create database loraserver_ns with owner loraserver_ns;"
+
+#psql script to create user and database.
+echo "Type here the password for postgresql user loraserver_as ['dbpassword']"
+read DB_PASSWORD_AS
+if [[ $DB_PASSWORD_AS == "" ]]; then
+	DB_PASSWORD_AS='dbpassword'
+fi
+
+sudo -u postgres psql -c "create role loraserver_as with login password '$DB_PASSWORD_AS';"
+sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as;"
 
 echo "Installing LoRa Gateway Bridge"
 
 DISTRIB_ID="debian"
 DISTRIB_CODENAME="jessie"
-
-apt-get install -y apt-transport-https
 
 pushd /etc/apt/sources.list.d/
 #check if loraserver repository is added into sources
@@ -210,47 +277,14 @@ apt-get install -y lora-gateway-bridge
 
 echo "Installing LoRaWAN Server"
 
-apt-get install -y redis-server
-
-pushd /etc/apt/sources.list.d/
-if [ ! -f pgdg.list ]; then
-	wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-	echo "deb http://apt.postgresql.org/pub/repos/apt/ ${DISTRIB_CODENAME}-pgdg main" | tee pgdg.list
-fi
-popd
-apt-get update
-apt-get install -y postgresql-9.6
-
-#psql script to create user and database.
-echo "Type here the password for postgresql user loraserver_ns ['dbpassword']"
-read DB_PASSWORD
-if [[ $DB_PASSWORD == "" ]]; then
-	DB_PASSWORD='dbpassword'
-fi
-
-sudo -u postgres psql -c "create role loraserver_ns with login password '$DB_PASSWORD';"
-sudo -u postgres psql -c "create database loraserver_ns with owner loraserver_ns;"
-
 apt-get install -y loraserver
 
 echo "Installing LoRa Application Server"
 
-echo "Type here the password for postgresql user loraserver_as ['dbpassword']"
-read DB_PASSWORD
-if [[ $DB_PASSWORD == "" ]]; then
-	DB_PASSWORD='dbpassword'
-fi
-
-sudo -u postgres psql -c "create role loraserver_as with login password '$DB_PASSWORD';"
-sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as;"
-
 apt-get install -y lora-app-server
 
-pushd /etc/default
-sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost\/loraserver_as?sslmode=disable/POSTGRES_DSN=postgres:\/\/loraserver_as:'"$DB_PASSWORD"'@localhost\/loraserver_as?sslmode=disable/g' ./lora-app-server
-sed -i -e 's/POSTGRES_DSN=postgres:\/\/localhost\/loraserver_ns?sslmode=disable/POSTGRES_DSN=postgres:\/\/loraserver_ns:'"$DB_PASSWORD"'@localhost\/loraserver_ns?sslmode=disable/g' ./loraserver
-popd
+echo "In order to get the system working the files '/etc/default/lora-gateway-bridge', '/etc/default/loraserver' and '/etc/default/lora-app-server' must be updated with the correct parameters"
 
-echo "The system will reboot in 5 seconds..."
-sleep 5
+echo "The system will reboot in 30 seconds..."
+sleep 30
 shutdown -r now
