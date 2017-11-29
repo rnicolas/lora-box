@@ -36,22 +36,22 @@ apt-get update
 apt-get -y upgrade
 echo
 
-echo "Activating SPI port on Raspberry PI"
+#echo "Activating SPI port on Raspberry PI"
 
-pushd /boot
-sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
-popd
+#pushd /boot
+#sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
+#popd
 
-echo "Adding a script to power off RPi using pin 26"
+#echo "Adding a script to power off RPi using pin 26"
 
-pushd /usr/local/bin
-if [ ! -f powerBtn.py ]
-then
-	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
-	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
-fi
+#pushd /usr/local/bin
+#if [ ! -f powerBtn.py ]
+#then
+#	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
+#	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
+#fi
 
-popd
+#popd
 
 # Request gateway configuration data
 # There are two ways to do it, manually specify everything
@@ -80,9 +80,9 @@ printf "       Host name [lora-box]:"
 read NEW_HOSTNAME
 if [[ $NEW_HOSTNAME == "" ]]; then NEW_HOSTNAME="lora-box"; fi
 
-printf "       Descriptive name [RPi-iC880A]:"
+printf "       Descriptive name [NanoPi-iC880A]:"
 read GATEWAY_NAME
-if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-iC880A"; fi
+if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="NanoPi-iC880A"; fi
 
 printf "       Contact email: "
 read GATEWAY_EMAIL
@@ -191,8 +191,7 @@ fi
 echo "Adding repository for PostgreSQL 9.6"
 
 if [ ! -f backports.list ]; then
-	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
-	gpg --keyserver pgkeys.mit.edu --recv-key 7638D0442B90D010
+	gpg --keyserver pgpkeys.mit.edu --recv-key 7638D0442B90D010
 	gpg -a --export 7638D0442B90D010 | apt-key add -
 	echo "deb http://ftp.debian.org/debian jessie-backports main" > backports.list
 fi
