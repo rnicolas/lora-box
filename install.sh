@@ -24,12 +24,12 @@ if [[ $OLD_HEAD != $NEW_HEAD ]]; then
     exec "./install.sh" "$VERSION"
 fi
 # Disabling Blank Screen and PowerDown when Pi is not active.
-echo "Disabling blank screen after 30 minutes of inactivity"
-pushd /etc/kbd/
-sed -i -e 's/BLANK_TIME=30/BLANK_TIME=0/g' ./config
-echo "Disabling Automatic Power Off after 30 minutes of inactivity"
-sed -i -e 's/POWERDOWN_TIME=30/POWERDOWN_TIME=0/g' ./config
-popd
+#echo "Disabling blank screen after 30 minutes of inactivity"
+#pushd /etc/kbd/
+#sed -i -e 's/BLANK_TIME=30/BLANK_TIME=0/g' ./config
+#echo "Disabling Automatic Power Off after 30 minutes of inactivity"
+#sed -i -e 's/POWERDOWN_TIME=30/POWERDOWN_TIME=0/g' ./config
+#popd
 # Check dependencies
 echo "Updating OS..."
 apt-get update
