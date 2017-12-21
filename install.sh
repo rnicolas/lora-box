@@ -175,68 +175,47 @@ popd
 cp ./lora-box.service /etc/systemd/system/
 systemctl enable lora-box.service
 
-echo "Adding new repositories for the dependencies"
-
-echo "Adding rpository for Mosquitto MQTT server"
-
-wget http://repo.mosquitto.org/debian/mosquitto-repo.gpg.key
-apt-key add mosquitto-repo.gpg.key
-rm mosquitto-repo.gpg.key
-
-pushd /etc/apt/sources.list.d/
-if [ ! -f mosquitto-jessie.list ]; then
-	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
-fi
-
-echo "Adding repository for PostgreSQL 9.6"
-
-if [ ! -f backports.list ]; then
-	wget http://repo.mosquitto.org/debian/mosquitto-jessie.list;
-	gpg --keyserver pgpkeys.mit.edu --recv-key 7638D0442B90D010
-	gpg -a --export 7638D0442B90D010 | apt-key add -
-	echo "deb http://ftp.debian.org/debian jessie-backports main" > backports.list
-fi
-
 apt-get install -y apt-transport-https
 apt-get update
 apt-get upgrade
 
 echo "Installing dependencies"
-apt-get install -y mosquitto mosquitto-clients redis-server redis-tools postgresql-common/jessie-backports postgresql-client-9.6/jessie-backports postgresql-9.6/jessie-backports
+apt-get install -y mosquitto mosquitto-clients redis-server redis-tools postgresql-common postgresql-client postgresql
 
 # Create a password file for your mosquitto users, starting with a “root” user.
 # The “-c” parameter creates the new password file. The command will prompt for
 # a new password for the user.
-mosquitto_passwd -c /etc/mosquitto/pwd loraroot
+mosquitto_passwd -c /etc/mosquitto/passwd loraroot
 
 # Add users for the various MQTT protocol users
-mosquitto_passwd /etc/mosquitto/pwd loragw
 read LORA_GW_PASSWD
 if [[ $LORA_GW_PASSWD == "" ]]; then
 	LORA_GW_PASSWD='loragwpasswd'
 fi
-mosquitto_passwd /etc/mosquitto/pwd loraserver
+mosquitto_passwd -b /etc/mosquitto/passwd loragw $LORA_GW_PASSWD
+
 read LORA_SERVER_PASSWD
 if [[ $LORA_SERVER_PASSWD == "" ]]; then
 	LORA_SERVER_PASSWD='loraserverpasswd'
 fi
-mosquitto_passwd /etc/mosquitto/pwd loraappserver
+mosquitto_passwd -b /etc/mosquitto/passwd loraserver $LORA_SERVER_PASSWD
+
 read LORA_APP_SERVER_PASSWD
 if [[ $LORA_APP_SERVER_PASSWD == "" ]]; then
 	LORA_APP_SERVER_PASSWD='loraappserverpasswd'
 fi
+mosquitto_passwd -b /etc/mosquitto/passwd loraappserver $LORA_APP_SERVER_PASSWD
 
 # Secure the password file
-chmod 600 /etc/mosquitto/pwd
+chmod 600 /etc/mosquitto/passwd
 
 pushd /etc/mosquitto/conf.d/
 if [ ! -f local.conf ]; then
 	echo "allow_anonymous false" > local.conf
-	echo "password_file /etc/mosquitto/pwd" > local.conf
+	echo "password_file /etc/mosquitto/passwd" > local.conf
 fi
 
 systemctl restart mosquitto
-
 
 #psql script to create user and database.
 echo "Type here the password for postgresql user loraserver_ns ['dbpassword']"
@@ -261,7 +240,7 @@ sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as
 echo "Installing LoRa Gateway Bridge"
 
 DISTRIB_ID="debian"
-DISTRIB_CODENAME="jessie"
+DISTRIB_CODENAME="stretch"
 
 pushd /etc/apt/sources.list.d/
 #check if loraserver repository is added into sources
@@ -282,6 +261,25 @@ apt-get install -y loraserver
 echo "Installing LoRa Application Server"
 
 apt-get install -y lora-app-server
+
+pushd /etc/default/
+sed -i "s/MQTT_USERNAME=/MQTT_USERNAME=loragw/" lora-gateway-bridge
+sed -i "s/MQTT_PASSWORD=/MQTT_PASSWORD=$LORA_GW_PASSWD/" lora-gateway-bridge
+
+sed -i "s/MQTT_USERNAME=/MQTT_USERNAME=loraappserver/" lora-app-server
+sed -i "s/MQTT_PASSWORD=/MQTT_PASSWORD=$LORA_APP_SERVER_PASSWD/" lora-app-server
+#POSTGRES-DSN
+JWT_SECRET=$(openssl rand -base64 32)
+JWT_SECRET sed -i "s/JWT_SECRET=/JWT_SECRET=$JWT_SECRET/" lora-app-server
+
+
+sed -i "s/GW_MQTT_USERNAME=/GW_MQTT_USERNAME=loraserver/" loraserver
+sed -i "s/GW_MQTT_PASSWORD=/GW_MQTT_PASSWORD=$LORA_SERVER_PASSWD/" loraserver
+#POSTGRES-DSN
+GW_SECRET=$(openssl rand -base64 32)
+sed -i "s/GW_SERVER_JWT_SECRET=/GW_SERVER_JWT_SECRET=$GW_SECRET/" loraserver
+
+popd
 
 echo "In order to get the system working the files '/etc/default/lora-gateway-bridge', '/etc/default/loraserver' and '/etc/default/lora-app-server' must be updated with the correct parameters"
 
