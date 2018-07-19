@@ -34,255 +34,267 @@ fi
 echo "Updating OS..."
 apt-get update
 apt-get -y upgrade
-echo
+echo "OS Updated"
 
-echo "Activating SPI port on Raspberry PI"
+loraGw() {
+	echo "Activating SPI port on Raspberry PI"
 
-pushd /boot
-sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
-popd
+	pushd /boot
+	sed -i -e 's/#dtparam=spi=on/dtparam=spi=on/g' ./config.txt
+	popd
 
-echo "Adding a script to power off RPi using pin 26"
+	# Request gateway configuration data
+	# There are two ways to do it, manually specify everything
+	# or rely on the gateway EUI and retrieve settings files from remote (recommended)
+	echo "Gateway configuration:"
 
-pushd /usr/local/bin
-if [ ! -f powerBtn.py ]
-then
-	wget https://raw.githubusercontent.com/rnicolas/Simple-Raspberry-Pi-Shutdown-Button/master/powerBtn.py
-	sed -i -e '$i \python /usr/local/bin/powerBtn.py &\n' /etc/rc.local
-fi
+	# Try to get gateway ID from MAC address
+	# First try eth0, if that does not exist, try wlan0 (for RPi Zero)
+	GATEWAY_EUI_NIC="eth0"
+	if [[ `grep "$GATEWAY_EUI_NIC" /proc/net/dev` == "" ]]; then
+	    GATEWAY_EUI_NIC="wlan0"
+	fi
 
-popd
+	if [[ `grep "$GATEWAY_EUI_NIC" /proc/net/dev` == "" ]]; then
+	    echo "ERROR: No network interface found. Cannot set gateway ID."
+	    exit 1
+	fi
 
-# Request gateway configuration data
-# There are two ways to do it, manually specify everything
-# or rely on the gateway EUI and retrieve settings files from remote (recommended)
-echo "Gateway configuration:"
+	GATEWAY_EUI=$(ip link show $GATEWAY_EUI_NIC | awk '/ether/ {print $2}' | awk -F\: '{print $1$2$3"FFFE"$4$5$6}')
+	GATEWAY_EUI=${GATEWAY_EUI^^} # toupper
 
-# Try to get gateway ID from MAC address
-# First try eth0, if that does not exist, try wlan0 (for RPi Zero)
-GATEWAY_EUI_NIC="eth0"
-if [[ `grep "$GATEWAY_EUI_NIC" /proc/net/dev` == "" ]]; then
-    GATEWAY_EUI_NIC="wlan0"
-fi
+	echo "Detected EUI $GATEWAY_EUI from $GATEWAY_EUI_NIC"
 
-if [[ `grep "$GATEWAY_EUI_NIC" /proc/net/dev` == "" ]]; then
-    echo "ERROR: No network interface found. Cannot set gateway ID."
-    exit 1
-fi
+	# Setting personal configuration of LoRaWAN Gateway
+	printf "       Host name [lora-box]:"
+	read NEW_HOSTNAME
+	if [[ $NEW_HOSTNAME == "" ]]; then NEW_HOSTNAME="lora-box"; fi
 
-GATEWAY_EUI=$(ip link show $GATEWAY_EUI_NIC | awk '/ether/ {print $2}' | awk -F\: '{print $1$2$3"FFFE"$4$5$6}')
-GATEWAY_EUI=${GATEWAY_EUI^^} # toupper
+	printf "       Descriptive name [RPi-iC880A]:"
+	read GATEWAY_NAME
+	if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-iC880A"; fi
 
-echo "Detected EUI $GATEWAY_EUI from $GATEWAY_EUI_NIC"
+	printf "       Contact email: "
+	read GATEWAY_EMAIL
 
-# Setting personal configuration of LoRaWAN Gateway
-printf "       Host name [lora-box]:"
-read NEW_HOSTNAME
-if [[ $NEW_HOSTNAME == "" ]]; then NEW_HOSTNAME="lora-box"; fi
+	printf "       Latitude [0]: "
+	read GATEWAY_LAT
+	if [[ $GATEWAY_LAT == "" ]]; then GATEWAY_LAT=0; fi
 
-printf "       Descriptive name [RPi-iC880A]:"
-read GATEWAY_NAME
-if [[ $GATEWAY_NAME == "" ]]; then GATEWAY_NAME="RPi-iC880A"; fi
+	printf "       Longitude [0]: "
+	read GATEWAY_LON
+	if [[ $GATEWAY_LON == "" ]]; then GATEWAY_LON=0; fi
 
-printf "       Contact email: "
-read GATEWAY_EMAIL
+	printf "       Altitude [0]: "
+	read GATEWAY_ALT
+	if [[ $GATEWAY_ALT == "" ]]; then GATEWAY_ALT=0; fi
 
-printf "       Latitude [0]: "
-read GATEWAY_LAT
-if [[ $GATEWAY_LAT == "" ]]; then GATEWAY_LAT=0; fi
+	# Change hostname if needed
+	CURRENT_HOSTNAME=$(hostname)
 
-printf "       Longitude [0]: "
-read GATEWAY_LON
-if [[ $GATEWAY_LON == "" ]]; then GATEWAY_LON=0; fi
+	if [[ $NEW_HOSTNAME != $CURRENT_HOSTNAME ]]; then
+	    echo "Updating hostname to '$NEW_HOSTNAME'..."
+	    hostname $NEW_HOSTNAME
+	    echo $NEW_HOSTNAME > /etc/hostname
+	    sed -i "s/$CURRENT_HOSTNAME/$NEW_HOSTNAME/" /etc/hosts
+	fi
 
-printf "       Altitude [0]: "
-read GATEWAY_ALT
-if [[ $GATEWAY_ALT == "" ]]; then GATEWAY_ALT=0; fi
+	# Install LoRaWAN packet forwarder repositories
+	INSTALL_DIR="/opt/lora-box"
+	if [ ! -d "$INSTALL_DIR" ]; then mkdir $INSTALL_DIR; fi
+	pushd $INSTALL_DIR
 
-# Change hostname if needed
-CURRENT_HOSTNAME=$(hostname)
+	# Build LoRa gateway app
+	if [ ! -d lora_gateway ]; then
+	    git clone https://github.com/Lora-net/lora_gateway.git
+	    pushd lora_gateway
+	else
+	    pushd lora_gateway
+	    git reset --hard
+	    git pull
+	fi
+	make
 
-if [[ $NEW_HOSTNAME != $CURRENT_HOSTNAME ]]; then
-    echo "Updating hostname to '$NEW_HOSTNAME'..."
-    hostname $NEW_HOSTNAME
-    echo $NEW_HOSTNAME > /etc/hostname
-    sed -i "s/$CURRENT_HOSTNAME/$NEW_HOSTNAME/" /etc/hosts
-fi
+	popd
 
-# Install LoRaWAN packet forwarder repositories
-INSTALL_DIR="/opt/lora-box"
-if [ ! -d "$INSTALL_DIR" ]; then mkdir $INSTALL_DIR; fi
-pushd $INSTALL_DIR
+	# Build packet forwarder
+	if [ ! -d packet_forwarder ]; then
+	    git clone https://github.com/Lora-net/packet_forwarder.git
+	    pushd packet_forwarder
+	else
+	    pushd packet_forwarder
+	    git pull
+	    git reset --hard
+	fi
+	make
 
-# Build LoRa gateway app
-if [ ! -d lora_gateway ]; then
-    git clone https://github.com/Lora-net/lora_gateway.git
-    pushd lora_gateway
-else
-    pushd lora_gateway
-    git reset --hard
-    git pull
-fi
-make
+	popd
 
-popd
+	# Symlink packet forwarder
+	if [ ! -d bin ]; then mkdir bin; fi
+	if [ -f ./bin/lora_pkt_fwd ]; then rm ./bin/lora_pkt_fwd; fi
+	ln -s $INSTALL_DIR/packet_forwarder/lora_pkt_fwd/lora_pkt_fwd ./bin/lora_pkt_fwd
+	cp -f ./packet_forwarder/lora_pkt_fwd/global_conf.json ./bin/global_conf.json
 
-# Build packet forwarder
-if [ ! -d packet_forwarder ]; then
-    git clone https://github.com/Lora-net/packet_forwarder.git
-    pushd packet_forwarder
-else
-    pushd packet_forwarder
-    git pull
-    git reset --hard
-fi
-make
+	LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
 
-popd
+	# Remove old config file
+	if [ -e $LOCAL_CONFIG_FILE ]; then
+		rm $LOCAL_CONFIG_FILE
+	fi
 
-# Symlink packet forwarder
-if [ ! -d bin ]; then mkdir bin; fi
-if [ -f ./bin/lora_pkt_fwd ]; then rm ./bin/lora_pkt_fwd; fi
-ln -s $INSTALL_DIR/packet_forwarder/lora_pkt_fwd/lora_pkt_fwd ./bin/lora_pkt_fwd
-cp -f ./packet_forwarder/lora_pkt_fwd/global_conf.json ./bin/global_conf.json
+	printf "       Server Address ['localhost']:"
+	read NEW_SERVER
+	if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="localhost"; fi
 
-LOCAL_CONFIG_FILE=$INSTALL_DIR/bin/local_conf.json
+	echo -e "{\n\t\"gateway_conf\": {\n\t\t\"gateway_ID\": \"$GATEWAY_EUI\",\n\t\t\"server_address\": \"$NEW_SERVER\",\n\t\t\"serv_port_up\": 1700,\n\t\t\"serv_port_down\": 1700,\n\t\t\"ref_latitude\": $GATEWAY_LAT,\n\t\t\"ref_longitude\": $GATEWAY_LON,\n\t\t\"ref_altitude\": $GATEWAY_ALT,\n\t\t\"contact_email\": \"$GATEWAY_EMAIL\",\n\t\t\"description\": \"$GATEWAY_NAME\" \n\t}\n}" >$LOCAL_CONFIG_FILE
 
-# Remove old config file
-if [ -e $LOCAL_CONFIG_FILE ]; then
-	rm $LOCAL_CONFIG_FILE
-fi
+	popd
 
-printf "       Server Address ['localhost']:"
-read NEW_SERVER
-if [[ $NEW_SERVER == "" ]]; then NEW_SERVER="localhost"; fi
+	echo "Gateway EUI is: $GATEWAY_EUI"
+	echo "The hostname is: $NEW_HOSTNAME"
+	echo "The Gateway is pointing to: $NEW_SERVER"
+	echo
+	echo "Installation completed."
 
-echo -e "{\n\t\"gateway_conf\": {\n\t\t\"gateway_ID\": \"$GATEWAY_EUI\",\n\t\t\"server_address\": \"$NEW_SERVER\",\n\t\t\"serv_port_up\": 1700,\n\t\t\"serv_port_down\": 1700,\n\t\t\"ref_latitude\": $GATEWAY_LAT,\n\t\t\"ref_longitude\": $GATEWAY_LON,\n\t\t\"ref_altitude\": $GATEWAY_ALT,\n\t\t\"contact_email\": \"$GATEWAY_EMAIL\",\n\t\t\"description\": \"$GATEWAY_NAME\" \n\t}\n}" >$LOCAL_CONFIG_FILE
+	# Start packet forwarder as a service
+	cp ./start.sh $INSTALL_DIR/bin/
+	pushd $INSTALL_DIR/bin/
+	chmod +x start.sh
+	popd
+	cp ./lora-box.service /etc/systemd/system/
+	systemctl enable lora-box.service
+}
 
-popd
+loraServer() {
+	apt-get install -y apt-transport-https
+	apt-get update
+	apt-get upgrade
 
-echo "Gateway EUI is: $GATEWAY_EUI"
-echo "The hostname is: $NEW_HOSTNAME"
-echo "The Gateway is pointing to: $NEW_SERVER"
-echo
-echo "Installation completed."
+	echo "Installing dependencies"
+	apt-get install -y mosquitto mosquitto-clients redis-server redis-tools postgresql-common postgresql-client postgresql
 
-# Start packet forwarder as a service
-cp ./start.sh $INSTALL_DIR/bin/
-pushd $INSTALL_DIR/bin/
-chmod +x start.sh
-popd
-cp ./lora-box.service /etc/systemd/system/
-systemctl enable lora-box.service
+	# Create a password file for your mosquitto users, starting with a “root” user.
+	# The “-c” parameter creates the new password file. The command will prompt for
+	# a new password for the user.
+	mosquitto_passwd -c /etc/mosquitto/passwd loraroot
 
-apt-get install -y apt-transport-https
-apt-get update
-apt-get upgrade
+	# Add users for the various MQTT protocol users
+	printf "Configuring MQTT (mosquitto) service:"
+	printf "       Insert Lora Gateway Password for MQTT authentication ['loragwpasswd']:"
+	read LORA_GW_PASSWD
+	if [[ $LORA_GW_PASSWD == "" ]]; then
+		LORA_GW_PASSWD='loragwpasswd'
+	fi
+	mosquitto_passwd -b /etc/mosquitto/passwd loragw $LORA_GW_PASSWD
 
-echo "Installing dependencies"
-apt-get install -y mosquitto mosquitto-clients redis-server redis-tools postgresql-common postgresql-client postgresql
+	printf "       Insert Lora Server Password for MQTT authentication ['loraserverpasswd']:"
+	read LORA_SERVER_PASSWD
+	if [[ $LORA_SERVER_PASSWD == "" ]]; then
+		LORA_SERVER_PASSWD='loraserverpasswd'
+	fi
+	mosquitto_passwd -b /etc/mosquitto/passwd loraserver $LORA_SERVER_PASSWD
 
-# Create a password file for your mosquitto users, starting with a “root” user.
-# The “-c” parameter creates the new password file. The command will prompt for
-# a new password for the user.
-mosquitto_passwd -c /etc/mosquitto/passwd loraroot
+	printf "       Insert Lora Application Server Password for MQTT authentication ['loraappserverpasswd']:"
+	read LORA_APP_SERVER_PASSWD
+	if [[ $LORA_APP_SERVER_PASSWD == "" ]]; then
+		LORA_APP_SERVER_PASSWD='loraappserverpasswd'
+	fi
+	mosquitto_passwd -b /etc/mosquitto/passwd loraappserver $LORA_APP_SERVER_PASSWD
 
-# Add users for the various MQTT protocol users
-read LORA_GW_PASSWD
-if [[ $LORA_GW_PASSWD == "" ]]; then
-	LORA_GW_PASSWD='loragwpasswd'
-fi
-mosquitto_passwd -b /etc/mosquitto/passwd loragw $LORA_GW_PASSWD
+	# Secure the password file
+	chmod 600 /etc/mosquitto/passwd
 
-read LORA_SERVER_PASSWD
-if [[ $LORA_SERVER_PASSWD == "" ]]; then
-	LORA_SERVER_PASSWD='loraserverpasswd'
-fi
-mosquitto_passwd -b /etc/mosquitto/passwd loraserver $LORA_SERVER_PASSWD
+	pushd /etc/mosquitto/conf.d/
+	if [ ! -f local.conf ]; then
+		echo "allow_anonymous false" > local.conf
+		echo "password_file /etc/mosquitto/passwd" > local.conf
+	fi
+	echo "MQTT (mosquitto) configuration is done."
+	systemctl restart mosquitto
 
-read LORA_APP_SERVER_PASSWD
-if [[ $LORA_APP_SERVER_PASSWD == "" ]]; then
-	LORA_APP_SERVER_PASSWD='loraappserverpasswd'
-fi
-mosquitto_passwd -b /etc/mosquitto/passwd loraappserver $LORA_APP_SERVER_PASSWD
+	printf "Configuring Database (PostgreSQL):"
+	#psql script to create user and database.
+	printf "       Type here the password for postgresql user loraserver_ns ['dbpassword']"
+	read DB_PASSWORD_NS
+	if [[ $DB_PASSWORD_NS == "" ]]; then
+		DB_PASSWORD_NS='dbpassword'
+	fi
 
-# Secure the password file
-chmod 600 /etc/mosquitto/passwd
+	sudo -u postgres psql -c "create role loraserver_ns with login password '$DB_PASSWORD_NS';"
+	sudo -u postgres psql -c "create database loraserver_ns with owner loraserver_ns;"
 
-pushd /etc/mosquitto/conf.d/
-if [ ! -f local.conf ]; then
-	echo "allow_anonymous false" > local.conf
-	echo "password_file /etc/mosquitto/passwd" > local.conf
-fi
+	#psql script to create user and database.
+	echo "       Type here the password for postgresql user loraserver_as ['dbpassword']"
+	read DB_PASSWORD_AS
+	if [[ $DB_PASSWORD_AS == "" ]]; then
+		DB_PASSWORD_AS='dbpassword'
+	fi
 
-systemctl restart mosquitto
+	sudo -u postgres psql -c "create role loraserver_as with login password '$DB_PASSWORD_AS';"
+	sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as;"
+	sudo -u postgres psql -d loraserver_as -c "create extension pg_trgm;"
+	echo "Database (PostgreSQL) configuration is done"
+	echo "Installing LoRa Gateway Bridge"
 
-#psql script to create user and database.
-echo "Type here the password for postgresql user loraserver_ns ['dbpassword']"
-read DB_PASSWORD_NS
-if [[ $DB_PASSWORD_NS == "" ]]; then
-	DB_PASSWORD_NS='dbpassword'
-fi
+	pushd /etc/apt/sources.list.d/
+	#check if loraserver repository is added into sources
+	if [ ! -f loraserver.list ]; then
+		apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
+		echo "deb https://artifacts.loraserver.io/packages/1.x/deb stable main" | tee loraserver.list
+	fi
+	popd
 
-sudo -u postgres psql -c "create role loraserver_ns with login password '$DB_PASSWORD_NS';"
-sudo -u postgres psql -c "create database loraserver_ns with owner loraserver_ns;"
+	apt-get update
 
-#psql script to create user and database.
-echo "Type here the password for postgresql user loraserver_as ['dbpassword']"
-read DB_PASSWORD_AS
-if [[ $DB_PASSWORD_AS == "" ]]; then
-	DB_PASSWORD_AS='dbpassword'
-fi
+	echo "Installing LoRa-Gateway-Bridge"
 
-sudo -u postgres psql -c "create role loraserver_as with login password '$DB_PASSWORD_AS';"
-sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as;"
+	apt-get install -y lora-gateway-bridge
 
-echo "Installing LoRa Gateway Bridge"
+	echo "Installing LoRaWAN Server"
 
-DISTRIB_ID="debian"
-DISTRIB_CODENAME="stretch"
+	apt-get install -y loraserver
 
-pushd /etc/apt/sources.list.d/
-#check if loraserver repository is added into sources
-if [ ! -f loraserver.list ]; then
-	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
-	echo "deb https://repos.loraserver.io/${DISTRIB_ID} ${DISTRIB_CODENAME} testing" | tee loraserver.list
-fi
-popd
+	echo "Installing LoRa Application Server"
 
-apt-get update
+	apt-get install -y lora-app-server
 
-apt-get install -y lora-gateway-bridge
+	pushd /etc/lora-gateway-bridge/
+	sed -i "s/username=\"\"/username=\"loragw\"/" lora-gateway-bridge.toml
+	sed -i "s/password=\"\"/password=\"$LORA_GW_PASSWD\"/" lora-gateway-bridge.toml
+	popd
 
-echo "Installing LoRaWAN Server"
+	pushd /etc/lora-app-server
+	sed -i "s/username=\"\"/username=\"loraappserver\"/" lora-app-server.toml
+	sed -i "s/password=\"\"/password=\"$LORA_APP_SERVER_PASSWD\"/" lora-app-server.toml
+	sed -i "s/dsn=\"postgres:\/\/localhost\/loraserver_as?sslmode=disable\"/dsn=\"postgres:\/\/loraserver_as:$DB_PASSWORD_AS@localhost\/loraserver_as?sslmode=disable/\"" lora-app-server.toml
+	JWT_SECRET=$(openssl rand -base64 33)
+	sed -i "s/jwt_secret=\"\"/jwt_secret=\"$JWT_SECRET\"/" lora-app-server.toml
+	popd
 
-apt-get install -y loraserver
+	pushd /etc/loraserver
+	sed -i "s/username=\"\"/username=\"loraserver\"/" loraserver.toml
+	sed -i "s/password=\"\"/password=\"$LORA_SERVER_PASSWD\"/" loraserver.toml
+	#POSTGRES-DSN
+	sed -i "s/dsn=\"postgres:\/\/localhost\/loraserver_ns?sslmode=disable\"/dsn=\"postgres:\/\/loraserver_ns:$DB_PASSWORD_NS@localhost\/loraserver_ns?sslmode=disable/\"" loraserver.toml
+	popd
 
-echo "Installing LoRa Application Server"
+	echo "In order to get the system working the files '/etc/default/lora-gateway-bridge', '/etc/default/loraserver' and '/etc/default/lora-app-server' must be updated with the correct parameters"
 
-apt-get install -y lora-app-server
+	echo "The system will reboot in 30 seconds..."
+	sleep 30
+	shutdown -r now
+}
 
-pushd /etc/default/
-sed -i "s/MQTT_USERNAME=/MQTT_USERNAME=loragw/" lora-gateway-bridge
-sed -i "s/MQTT_PASSWORD=/MQTT_PASSWORD=$LORA_GW_PASSWD/" lora-gateway-bridge
-
-sed -i "s/MQTT_USERNAME=/MQTT_USERNAME=loraappserver/" lora-app-server
-sed -i "s/MQTT_PASSWORD=/MQTT_PASSWORD=$LORA_APP_SERVER_PASSWD/" lora-app-server
-#POSTGRES-DSN
-JWT_SECRET=$(openssl rand -base64 32)
-JWT_SECRET sed -i "s/JWT_SECRET=/JWT_SECRET=$JWT_SECRET/" lora-app-server
-
-
-sed -i "s/GW_MQTT_USERNAME=/GW_MQTT_USERNAME=loraserver/" loraserver
-sed -i "s/GW_MQTT_PASSWORD=/GW_MQTT_PASSWORD=$LORA_SERVER_PASSWD/" loraserver
-#POSTGRES-DSN
-GW_SECRET=$(openssl rand -base64 32)
-sed -i "s/GW_SERVER_JWT_SECRET=/GW_SERVER_JWT_SECRET=$GW_SECRET/" loraserver
-
-popd
-
-echo "In order to get the system working the files '/etc/default/lora-gateway-bridge', '/etc/default/loraserver' and '/etc/default/lora-app-server' must be updated with the correct parameters"
-
-echo "The system will reboot in 30 seconds..."
-sleep 30
-shutdown -r now
+switch ($case) {
+	case 'lightLoraBox':
+		loraGw
+		break;
+	case 'LoraBox':
+		loraGw
+		loraServer
+		break;
+	case 'loraServer':
+		loraServer
+		break;
+}
