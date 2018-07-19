@@ -164,6 +164,47 @@ loraGw() {
 	popd
 	cp ./lora-box.service /etc/systemd/system/
 	systemctl enable lora-box.service
+
+	echo "Installing LoRa Gateway Bridge"
+
+	pushd /etc/apt/sources.list.d/
+	#check if loraserver repository is added into sources
+	if [ ! -f loraserver.list ]; then
+		apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
+		echo "deb https://artifacts.loraserver.io/packages/1.x/deb stable main" | tee loraserver.list
+		apt-get update
+	fi
+	popd
+	echo "Installing dependencies"
+	apt-get install -y mosquitto
+	echo "Installing Lora Gateway Bridge"
+	apt-get install -y lora-gateway-bridge
+
+	# Create a password file for your mosquitto users, starting with a “root” user.
+	# The “-c” parameter creates the new password file. The command will prompt for
+	# a new password for the user.
+	if [ ! -f /etc/mosquitto/passwd ]; then
+		mosquitto_passwd -c /etc/mosquitto/passwd loraroot
+	fi
+
+	printf "Configuring MQTT (mosquitto) service:"
+	printf "       Insert Lora Gateway Password for MQTT authentication ['loragwpasswd']:"
+	read LORA_GW_PASSWD
+	if [[ $LORA_GW_PASSWD == "" ]]; then
+		LORA_GW_PASSWD='loragwpasswd'
+	fi
+	mosquitto_passwd -b /etc/mosquitto/passwd loragw $LORA_GW_PASSWD
+
+	# Secure the password file
+	chmod 600 /etc/mosquitto/passwd
+
+	pushd /etc/mosquitto/conf.d/
+	if [ ! -f local.conf ]; then
+		echo "allow_anonymous false" > local.conf
+		echo "password_file /etc/mosquitto/passwd" > local.conf
+	fi
+	echo "MQTT (mosquitto) configuration is done."
+	systemctl restart mosquitto
 }
 
 loraServer() {
@@ -177,16 +218,13 @@ loraServer() {
 	# Create a password file for your mosquitto users, starting with a “root” user.
 	# The “-c” parameter creates the new password file. The command will prompt for
 	# a new password for the user.
-	mosquitto_passwd -c /etc/mosquitto/passwd loraroot
+
+	if [ ! -f /etc/mosquitto/passwd ]; then
+		mosquitto_passwd -c /etc/mosquitto/passwd loraroot
+	fi
 
 	# Add users for the various MQTT protocol users
 	printf "Configuring MQTT (mosquitto) service:"
-	printf "       Insert Lora Gateway Password for MQTT authentication ['loragwpasswd']:"
-	read LORA_GW_PASSWD
-	if [[ $LORA_GW_PASSWD == "" ]]; then
-		LORA_GW_PASSWD='loragwpasswd'
-	fi
-	mosquitto_passwd -b /etc/mosquitto/passwd loragw $LORA_GW_PASSWD
 
 	printf "       Insert Lora Server Password for MQTT authentication ['loraserverpasswd']:"
 	read LORA_SERVER_PASSWD
@@ -235,15 +273,7 @@ loraServer() {
 	sudo -u postgres psql -c "create database loraserver_as with owner loraserver_as;"
 	sudo -u postgres psql -d loraserver_as -c "create extension pg_trgm;"
 	echo "Database (PostgreSQL) configuration is done"
-	echo "Installing LoRa Gateway Bridge"
 
-	pushd /etc/apt/sources.list.d/
-	#check if loraserver repository is added into sources
-	if [ ! -f loraserver.list ]; then
-		apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1CE2AFD36DBCCA00
-		echo "deb https://artifacts.loraserver.io/packages/1.x/deb stable main" | tee loraserver.list
-	fi
-	popd
 
 	apt-get update
 
